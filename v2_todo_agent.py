@@ -414,7 +414,7 @@ def agent_loop(messages: list) -> list:
 
     Same core loop as v1, but now we track whether the model
     is using todos. If it goes too long without updating,
-    we'll inject a reminder in the main() function.
+    we inject a reminder into the next user message (tool results).
     """
     global rounds_without_todo
 
@@ -464,6 +464,12 @@ def agent_loop(messages: list) -> list:
             rounds_without_todo += 1
 
         messages.append({"role": "assistant", "content": response.content})
+
+        # Inject NAG_REMINDER into user message if model hasn't used todos
+        # This happens INSIDE the agent loop, so model sees it during task execution
+        if rounds_without_todo > 10:
+            results.insert(0, {"type": "text", "text": NAG_REMINDER})
+
         messages.append({"role": "user", "content": results})
 
 
@@ -478,9 +484,8 @@ def main():
     Key v2 addition: We inject "reminder" messages to encourage
     todo usage without forcing it. This is a soft constraint.
 
-    Reminders are injected as part of the user message, not as
-    separate system prompts. The model sees them but doesn't
-    respond to them directly.
+    - INITIAL_REMINDER: injected at conversation start
+    - NAG_REMINDER: injected inside agent_loop when 10+ rounds without todo
     """
     global rounds_without_todo
 
@@ -500,16 +505,12 @@ def main():
             break
 
         # Build user message content
-        # May include reminders as context hints
         content = []
 
         if first_message:
-            # Gentle reminder at start
+            # Gentle reminder at start of conversation
             content.append({"type": "text", "text": INITIAL_REMINDER})
             first_message = False
-        elif rounds_without_todo > 10:
-            # Nag if model hasn't used todos in a while
-            content.append({"type": "text", "text": NAG_REMINDER})
 
         content.append({"type": "text", "text": user_input})
         history.append({"role": "user", "content": content})
