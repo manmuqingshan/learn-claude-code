@@ -483,6 +483,159 @@ def test_v8_teams_dir_path():
     return True
 
 
+def test_v8_teammate_bg_prefix():
+    """Verify v8's BackgroundManager maps 'teammate' type to 't' prefix.
+
+    v8 extends v7's prefix scheme: b=bash, a=agent, t=teammate.
+    This is how the notification system distinguishes task types.
+    """
+    from v8_teammate_agent import BackgroundManager
+    bm = BackgroundManager()
+    tid = bm.run_in_background(lambda: "teammate result", task_type="teammate")
+    assert tid.startswith("t"), f"Teammate task should start with 't', got '{tid[0]}'"
+    bm.get_output(tid, block=True, timeout=2000)
+    print("PASS: test_v8_teammate_bg_prefix")
+    return True
+
+
+def test_spawn_teammate_error_no_team():
+    """Verify spawn_teammate returns error for non-existent team."""
+    tm = TeammateManager()
+    result = tm.spawn_teammate("worker", "ghost-team", "do stuff")
+    assert "error" in result.lower(), \
+        f"Should return error for non-existent team, got: {result}"
+    print("PASS: test_spawn_teammate_error_no_team")
+    return True
+
+
+def test_spawn_teammate_returns_json():
+    """Verify spawn_teammate returns JSON with name, team, status."""
+    tm = TeammateManager()
+    tm.create_team("spawn-test")
+    result = tm.spawn_teammate("w1", "spawn-test", "test prompt")
+    data = json.loads(result)
+    assert data["name"] == "w1", f"Expected name 'w1', got '{data['name']}'"
+    assert data["team"] == "spawn-test", f"Expected team 'spawn-test', got '{data['team']}'"
+    assert data["status"] == "active", f"Expected status 'active', got '{data['status']}'"
+    tm.delete_team("spawn-test")
+    time.sleep(0.1)
+    print("PASS: test_spawn_teammate_returns_json")
+    return True
+
+
+def test_find_teammate_cross_team():
+    """Verify _find_teammate searches across all teams when team_name is None."""
+    tm = TeammateManager()
+    tm.create_team("alpha")
+    tm.create_team("beta")
+
+    inbox = Path(tempfile.mktemp(suffix=".jsonl"))
+    mate = Teammate(name="hidden-worker", team_name="beta", inbox_path=inbox)
+    tm._teams["beta"]["hidden-worker"] = mate
+
+    found = tm._find_teammate("hidden-worker")
+    assert found is not None, "Should find teammate by name across all teams"
+    assert found.team_name == "beta"
+
+    found_direct = tm._find_teammate("hidden-worker", "beta")
+    assert found_direct is not None, "Should find with explicit team_name"
+
+    not_found = tm._find_teammate("hidden-worker", "alpha")
+    assert not_found is None, "Should not find in wrong team"
+
+    inbox.unlink(missing_ok=True)
+    print("PASS: test_find_teammate_cross_team")
+    return True
+
+
+def test_teammate_loop_has_idle_phase():
+    """Verify _teammate_loop contains the idle phase polling mechanism.
+
+    The idle phase checks inbox every 2 seconds for 60 seconds,
+    and also looks for unclaimed tasks on the board.
+    """
+    import inspect
+    source = inspect.getsource(TeammateManager._teammate_loop)
+
+    assert "idle" in source, "Loop must set teammate status to 'idle'"
+    assert "check_inbox" in source, "Idle phase must check teammate inbox"
+    assert "sleep(2)" in source or "sleep( 2)" in source, \
+        "Idle phase should poll every 2 seconds"
+    assert "30" in source, "Idle phase should check 30 times (30 * 2s = 60s)"
+
+    print("PASS: test_teammate_loop_has_idle_phase")
+    return True
+
+
+def test_teammate_loop_identity_reinjection():
+    """Verify _teammate_loop re-injects identity after auto_compact.
+
+    When context is compressed, the teammate might forget who it is.
+    The loop must re-inject identity information.
+    """
+    import inspect
+    source = inspect.getsource(TeammateManager._teammate_loop)
+
+    assert "auto_compact" in source, "Loop must call auto_compact"
+    assert "Remember" in source or "identity" in source.lower() or "teammate.name" in source, \
+        "Loop must re-inject identity after compression"
+    assert "teammate.team_name" in source, \
+        "Identity re-injection must include team name"
+
+    print("PASS: test_teammate_loop_identity_reinjection")
+    return True
+
+
+def test_teammate_loop_unclaimed_task_pickup():
+    """Verify _teammate_loop picks up unclaimed, unblocked tasks.
+
+    During the idle phase, teammates should detect tasks that are
+    pending, have no owner, and have no blockers -- and claim them.
+    """
+    import inspect
+    source = inspect.getsource(TeammateManager._teammate_loop)
+
+    assert "unclaimed" in source or ("pending" in source and "owner" in source), \
+        "Loop must check for unclaimed pending tasks"
+    assert "in_progress" in source, \
+        "Loop must set claimed task to in_progress"
+    assert "TASK_MGR" in source or "task_mgr" in source, \
+        "Loop must interact with the shared task manager"
+
+    print("PASS: test_teammate_loop_unclaimed_task_pickup")
+    return True
+
+
+def test_broadcast_excludes_sender():
+    """Verify broadcast does not send message back to the sender."""
+    tm = TeammateManager()
+    tm.create_team("excl-team")
+
+    inboxes = {}
+    for name in ["lead", "worker1", "worker2"]:
+        inbox = Path(tempfile.mktemp(suffix=".jsonl"))
+        mate = Teammate(name=name, team_name="excl-team", inbox_path=inbox)
+        tm._teams["excl-team"][name] = mate
+        inboxes[name] = inbox
+
+    tm.send_message("", "Announcement", msg_type="broadcast",
+                    sender="lead", team_name="excl-team")
+
+    lead_msgs = tm.check_inbox("lead", "excl-team")
+    w1_msgs = tm.check_inbox("worker1", "excl-team")
+    w2_msgs = tm.check_inbox("worker2", "excl-team")
+
+    assert len(lead_msgs) == 0, \
+        f"Sender ('lead') should NOT receive own broadcast, got {len(lead_msgs)} msgs"
+    assert len(w1_msgs) >= 1, "worker1 should receive broadcast"
+    assert len(w2_msgs) >= 1, "worker2 should receive broadcast"
+
+    for inbox in inboxes.values():
+        inbox.unlink(missing_ok=True)
+    print("PASS: test_broadcast_excludes_sender")
+    return True
+
+
 # =============================================================================
 # LLM Integration Tests
 # =============================================================================
@@ -667,6 +820,14 @@ if __name__ == "__main__":
         test_v8_inbox_jsonl_format,
         test_v8_agent_loop_injects_identity,
         test_v8_teams_dir_path,
+        test_v8_teammate_bg_prefix,
+        test_spawn_teammate_error_no_team,
+        test_spawn_teammate_returns_json,
+        test_find_teammate_cross_team,
+        test_teammate_loop_has_idle_phase,
+        test_teammate_loop_identity_reinjection,
+        test_teammate_loop_unclaimed_task_pickup,
+        test_broadcast_excludes_sender,
         # LLM integration tests
         test_llm_creates_team,
         test_llm_sends_message,

@@ -1200,6 +1200,157 @@ def test_v8_message_types_count():
     return True
 
 
+def test_v7_notification_xml_construction():
+    """Verify agent_loop constructs <task-notification> XML from drain results."""
+    import inspect, v7_background_agent
+    source = inspect.getsource(v7_background_agent.agent_loop)
+    assert "task-notification" in source, \
+        "agent_loop must construct <task-notification> XML blocks"
+    assert "task-id" in source, \
+        "XML must include <task-id> element"
+    assert "status" in source, \
+        "XML must include status element"
+    print("PASS: test_v7_notification_xml_construction")
+    return True
+
+
+def test_v7_summary_truncation():
+    """Verify notification summary is truncated to 500 chars."""
+    import time
+    from v7_background_agent import BackgroundManager
+    bm = BackgroundManager()
+    long_output = "A" * 1000
+    tid = bm.run_in_background(lambda: long_output, task_type="bash")
+    bm.get_output(tid, block=True, timeout=5000)
+    time.sleep(0.1)
+    notifications = bm.drain_notifications()
+    target = [n for n in notifications if n["task_id"] == tid]
+    assert len(target) == 1, f"Expected 1 notification, got {len(target)}"
+    assert len(target[0]["summary"]) == 500, \
+        f"Summary should be 500 chars, got {len(target[0]['summary'])}"
+    print("PASS: test_v7_summary_truncation")
+    return True
+
+
+def test_v8_teammate_bg_prefix():
+    """Verify v8 BackgroundManager maps 'teammate' type to 't' prefix."""
+    from v8_teammate_agent import BackgroundManager
+    bm = BackgroundManager()
+    tid = bm.run_in_background(lambda: "x", task_type="teammate")
+    assert tid.startswith("t"), f"Teammate prefix should be 't', got '{tid[0]}'"
+    bm.get_output(tid, block=True, timeout=2000)
+    print("PASS: test_v8_teammate_bg_prefix")
+    return True
+
+
+def test_v8_spawn_teammate_errors():
+    """Verify spawn_teammate returns errors for invalid inputs."""
+    from v8_teammate_agent import TeammateManager
+    tm = TeammateManager()
+    result = tm.spawn_teammate("worker", "nonexistent-team", "prompt")
+    assert "error" in result.lower(), \
+        f"Should return error for non-existent team, got: {result}"
+    tm.create_team("err-team")
+    tm.spawn_teammate("dup", "err-team", "prompt")
+    import time; time.sleep(0.1)
+    result2 = tm.spawn_teammate("dup", "err-team", "another prompt")
+    assert "error" in result2.lower() or "already exists" in result2.lower(), \
+        f"Should return error for duplicate name, got: {result2}"
+    tm.delete_team("err-team")
+    print("PASS: test_v8_spawn_teammate_errors")
+    return True
+
+
+def test_v8_find_teammate_cross_team():
+    """Verify _find_teammate searches across teams when team_name is None."""
+    import tempfile
+    from pathlib import Path
+    from v8_teammate_agent import TeammateManager, Teammate
+    tm = TeammateManager()
+    tm.create_team("team-a")
+    tm.create_team("team-b")
+    inbox = Path(tempfile.mktemp(suffix=".jsonl"))
+    mate = Teammate(name="cross-worker", team_name="team-b", inbox_path=inbox)
+    tm._teams["team-b"]["cross-worker"] = mate
+    found = tm._find_teammate("cross-worker")
+    assert found is not None, "Should find teammate across teams without team_name"
+    assert found.name == "cross-worker"
+    assert found.team_name == "team-b"
+    not_found = tm._find_teammate("nonexistent")
+    assert not_found is None, "Should return None for non-existent teammate"
+    inbox.unlink(missing_ok=True)
+    print("PASS: test_v8_find_teammate_cross_team")
+    return True
+
+
+def test_v8_teammate_loop_structure():
+    """Verify _teammate_loop has key structural elements for the work cycle."""
+    import inspect, v8_teammate_agent
+    source = inspect.getsource(v8_teammate_agent.TeammateManager._teammate_loop)
+    assert "active" in source, "Loop must set status to 'active'"
+    assert "idle" in source, "Loop must set status to 'idle'"
+    assert "shutdown" in source, "Loop must check for 'shutdown'"
+    assert "check_inbox" in source, "Loop must check inbox for new messages"
+    assert "unclaimed" in source or "pending" in source, \
+        "Loop must check for unclaimed tasks"
+    assert "microcompact" in source, "Loop must apply microcompact compression"
+    assert "auto_compact" in source, "Loop must support auto_compact"
+    assert "teammate.name" in source or "teammate_name" in source or "identity" in source.lower(), \
+        "Loop must re-inject identity after compression"
+    print("PASS: test_v8_teammate_loop_structure")
+    return True
+
+
+def test_v8_broadcast_to_all():
+    """Verify broadcast sends to all teammates, not just one."""
+    import tempfile
+    from pathlib import Path
+    from v8_teammate_agent import TeammateManager, Teammate
+    tm = TeammateManager()
+    tm.create_team("bcast-test")
+    inboxes = []
+    for name in ["alice", "bob", "carol"]:
+        inbox = Path(tempfile.mktemp(suffix=".jsonl"))
+        mate = Teammate(name=name, team_name="bcast-test", inbox_path=inbox)
+        tm._teams["bcast-test"][name] = mate
+        inboxes.append(inbox)
+    tm.send_message("", "Attention all", msg_type="broadcast",
+                    sender="lead", team_name="bcast-test")
+    for i, name in enumerate(["alice", "bob", "carol"]):
+        msgs = tm.check_inbox(name, "bcast-test")
+        assert len(msgs) >= 1, f"{name} should have received broadcast"
+        assert msgs[0]["type"] == "broadcast"
+    for inbox in inboxes:
+        inbox.unlink(missing_ok=True)
+    print("PASS: test_v8_broadcast_to_all")
+    return True
+
+
+def test_v8_delete_sends_shutdown():
+    """Verify delete_team sends shutdown_request to all members."""
+    import tempfile, json
+    from pathlib import Path
+    from v8_teammate_agent import TeammateManager, Teammate
+    tm = TeammateManager()
+    tm.create_team("shutdown-test")
+    inboxes = []
+    for name in ["w1", "w2"]:
+        inbox = Path(tempfile.mktemp(suffix=".jsonl"))
+        mate = Teammate(name=name, team_name="shutdown-test", inbox_path=inbox)
+        tm._teams["shutdown-test"][name] = mate
+        inboxes.append(inbox)
+    tm.delete_team("shutdown-test")
+    for inbox in inboxes:
+        if inbox.exists():
+            msgs = [json.loads(l) for l in inbox.read_text().strip().split("\n") if l.strip()]
+            shutdown_msgs = [m for m in msgs if m.get("type") == "shutdown_request"]
+            assert len(shutdown_msgs) >= 1, \
+                f"Each teammate should receive shutdown_request, got {len(shutdown_msgs)}"
+        inbox.unlink(missing_ok=True)
+    print("PASS: test_v8_delete_sends_shutdown")
+    return True
+
+
 def test_v2_system_reminders():
     """Verify v2 has INITIAL_REMINDER and NAG_REMINDER for planning enforcement."""
     import v2_todo_agent
@@ -1315,10 +1466,18 @@ if __name__ == "__main__":
         test_v7_tool_count,
         test_v7_daemon_threads,
         test_v7_notification_drain_clears,
+        test_v7_notification_xml_construction,
+        test_v7_summary_truncation,
         # v8 mechanism-specific
         test_v8_tool_count,
         test_v8_teammate_tools_subset,
         test_v8_message_types_count,
+        test_v8_teammate_bg_prefix,
+        test_v8_spawn_teammate_errors,
+        test_v8_find_teammate_cross_team,
+        test_v8_teammate_loop_structure,
+        test_v8_broadcast_to_all,
+        test_v8_delete_sends_shutdown,
         # v2/v3 mechanism-specific
         test_v2_system_reminders,
         test_v3_context_isolation,

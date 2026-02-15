@@ -315,6 +315,62 @@ def test_v7_timeout_on_blocking_get():
     return True
 
 
+def test_v7_notification_xml_construction():
+    """Verify agent_loop constructs proper <task-notification> XML from drain results.
+
+    The main agent loop formats notifications as XML blocks and injects them
+    into user messages. This verifies the format matches what the model expects.
+    """
+    import inspect, v7_background_agent
+    source = inspect.getsource(v7_background_agent.agent_loop)
+
+    assert "task-notification" in source, \
+        "agent_loop must construct <task-notification> XML blocks"
+    assert "task-id" in source, \
+        "XML must include <task-id> element"
+    assert "drain_notifications" in source, \
+        "agent_loop must call drain_notifications"
+
+    print("PASS: test_v7_notification_xml_construction")
+    return True
+
+
+def test_v7_summary_truncation():
+    """Verify notification summary is truncated to 500 chars for large outputs.
+
+    Notifications carry a 'summary' field with the first 500 chars of output.
+    This gives the model enough context to decide if it needs the full result.
+    """
+    bm = BackgroundManager()
+    long_output = "X" * 1000
+    task_id = bm.run_in_background(lambda: long_output, task_type="bash")
+    bm.get_output(task_id, block=True, timeout=5000)
+
+    time.sleep(0.1)
+    notifications = bm.drain_notifications()
+    target = [n for n in notifications if n["task_id"] == task_id]
+    assert len(target) == 1, f"Expected 1 notification for task, got {len(target)}"
+    assert len(target[0]["summary"]) == 500, \
+        f"Summary should be exactly 500 chars, got {len(target[0]['summary'])}"
+
+    print("PASS: test_v7_summary_truncation")
+    return True
+
+
+def test_v7_event_based_waiting():
+    """Verify get_output uses Event.wait() not busy polling.
+
+    The BackgroundTask.event field is set when the task completes.
+    get_output(block=True) should wait on this event, not poll in a loop.
+    """
+    import inspect
+    source = inspect.getsource(BackgroundManager.get_output)
+    assert "event.wait" in source, \
+        "get_output must use event.wait() for efficient blocking"
+    print("PASS: test_v7_event_based_waiting")
+    return True
+
+
 def test_v7_bash_run_in_background_schema():
     """Verify bash tool schema includes run_in_background parameter in v7."""
     from v7_background_agent import ALL_TOOLS
@@ -494,6 +550,9 @@ if __name__ == "__main__":
         test_v7_agent_loop_drains_before_api,
         test_v7_background_task_thread_daemon,
         test_v7_timeout_on_blocking_get,
+        test_v7_notification_xml_construction,
+        test_v7_summary_truncation,
+        test_v7_event_based_waiting,
         test_v7_bash_run_in_background_schema,
         # LLM integration tests
         test_llm_uses_task_output,
