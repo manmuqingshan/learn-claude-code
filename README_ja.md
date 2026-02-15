@@ -64,16 +64,16 @@
     |                          +ContextManager、約896行
     v
 [v6: Tasks Agent] ----------> 「付箋からカンバンへ」
-    |                          +TaskManager、約957行
+    |                          +TaskManager、約1075行
     v
 [v7: Background Agent] -----> 「待たない、作業を続ける」
-    |                          +BackgroundManager、約1022行
+    |                          +BackgroundManager、約1142行
     v
 [v8: Team Agent] -----------> 「通信するチームメイト」
-    |                          +TeammateManager、約1402行
+    |                          +TeammateManager、約1553行
     v
 [v9: Autonomous Agent] -----> 「自己組織化するチーム」
-                               +アイドルサイクル、約1506行
+                               +アイドルサイクル、約1657行
 ```
 
 **おすすめの学習方法：**
@@ -140,10 +140,10 @@ while True:
 | [v3](./v3_subagent.py) | ~623 | +Task | コンテキスト分離 | クリーンなコンテキスト = より良い結果 |
 | [v4](./v4_skills_agent.py) | ~783 | +Skill | 知識読み込み | 再学習なしの専門性 |
 | [v5](./v5_compression_agent.py) | ~896 | +ContextManager | 3層圧縮 | 忘却が無限作業を可能にする |
-| [v6](./v6_tasks_agent.py) | ~957 | +TaskCreate/Get/Update/List | 永続タスク | 付箋からカンバンへ |
-| [v7](./v7_background_agent.py) | ~1022 | +TaskOutput/TaskStop | バックグラウンド実行 | 直列から並列へ |
-| [v8](./v8_team_agent.py) | ~1402 | +TeamCreate/SendMessage/TeamDelete | チーム通信 | 命令から協調へ |
-| [v9](./v9_autonomous_agent.py) | ~1506 | +アイドルサイクル/自動割当 | 自律チーム | 協調から自己組織化へ |
+| [v6](./v6_tasks_agent.py) | ~1075 | +TaskCreate/Get/Update/List | 永続タスク | 付箋からカンバンへ |
+| [v7](./v7_background_agent.py) | ~1142 | +TaskOutput/TaskStop | バックグラウンド実行 | 直列から並列へ |
+| [v8](./v8_team_agent.py) | ~1553 | +TeamCreate/SendMessage/TeamDelete | チーム通信 | 命令から協調へ |
+| [v9](./v9_autonomous_agent.py) | ~1657 | +アイドルサイクル/自動割当 | 自律チーム | 協調から自己組織化へ |
 
 ## サブメカニズムガイド
 
@@ -186,10 +186,10 @@ learn-claude-code/
 |-- v3_subagent.py            # ~623行: + Taskツール、エージェントレジストリ
 |-- v4_skills_agent.py        # ~783行: + Skillツール、SkillLoader
 |-- v5_compression_agent.py   # ~896行: + ContextManager、3層圧縮
-|-- v6_tasks_agent.py         # ~957行: + TaskManager、依存関係付きCRUD
-|-- v7_background_agent.py    # ~1022行: + BackgroundManager、並列実行
-|-- v8_team_agent.py          # ~1402行: + TeammateManager、チーム通信
-|-- v9_autonomous_agent.py    # ~1506行: + アイドルサイクル、自動割当、アイデンティティ保持
+|-- v6_tasks_agent.py         # ~1075行: + TaskManager、依存関係付きCRUD
+|-- v7_background_agent.py    # ~1142行: + BackgroundManager、並列実行
+|-- v8_team_agent.py          # ~1553行: + TeammateManager、チーム通信
+|-- v9_autonomous_agent.py    # ~1657行: + アイドルサイクル、自動割当、アイデンティティ保持
 |-- skills/                   # サンプルSkills（pdf, code-review, mcp-builder, agent-builder）
 |-- docs/                     # 技術ドキュメント（EN + ZH + JA）
 |-- articles/                 # ブログ形式の記事（ZH）

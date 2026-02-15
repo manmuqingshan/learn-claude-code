@@ -234,4 +234,4 @@ The full record is always on disk. Compression only affects working memory, not 
 
 **Context is finite, work is infinite. Compression keeps the agent going.**
 
-[<< v4](./v4-skills-mechanism.md) | [Back to README](../README.md) | [v6 >>](./v6-tasks-system.md)
+[← v4](./v4-skills-mechanism.md) | [Back to README](../README.md) | [v6 →](./v6-tasks-system.md)

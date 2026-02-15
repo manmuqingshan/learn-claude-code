@@ -281,15 +281,35 @@ TASK_MGR = TaskManager()
 # ContextManager (from v5)
 # =============================================================================
 
+def auto_compact_threshold(context_window: int = 200000, max_output: int = 16384) -> int:
+    """Dynamic threshold: context_window - min(max_output, 20000) - 13000.
+    For a 200K window with 16K output: 200000 - 16384 - 13000 = 170616."""
+    output_reserve = min(max_output, 20000)
+    return context_window - output_reserve - 13000
+
+
+MIN_SAVINGS = 20000
+MAX_RESTORE_FILES = 5
+MAX_RESTORE_TOKENS_PER_FILE = 5000
+MAX_RESTORE_TOKENS_TOTAL = 50000
+IMAGE_TOKEN_ESTIMATE = 2000
+
+
 class ContextManager:
-    """Three-layer context compression (microcompact, auto-compact, manual)."""
+    """
+    Three-layer context compression to keep conversations within window limits.
+
+    Human working memory is limited too - we don't remember every line of code
+    we wrote, just "what we did, why, and current state". Compression mimics
+    this cognitive pattern:
+    - Micro-compact = short-term memory auto-decay
+    - Auto-compact  = detail memory -> concept memory
+    - Disk transcript = long-term memory archive
+    """
 
     COMPACTABLE_TOOLS = {"bash", "read_file", "write_file", "edit_file"}
     KEEP_RECENT = 3
-    # The real Claude Code formula: threshold = context_window - min(max_output, 20000) - 13000
-    # For a 128k window: 128000 - 20000 - 13000 = 95000 tokens.
-    # We use 93000 as a simplified constant for educational purposes.
-    TOKEN_THRESHOLD = 93000
+    TOKEN_THRESHOLD = auto_compact_threshold()
     MAX_OUTPUT_TOKENS = 40000
 
     def __init__(self, max_context_tokens: int = 200000):
@@ -302,7 +322,14 @@ class ContextManager:
         return len(text) * 4 // 3
 
     def microcompact(self, messages: list) -> list:
+        """
+        Layer 1: Replace old large tool outputs with placeholders.
+
+        Keeps the tool call structure intact - the model still knows WHAT
+        it called, just can't see the old output. It can re-read if needed.
+        """
         tool_result_indices = []
+
         for i, msg in enumerate(messages):
             if msg.get("role") != "user":
                 continue
@@ -315,50 +342,139 @@ class ContextManager:
                     if tool_name in self.COMPACTABLE_TOOLS:
                         tool_result_indices.append((i, j, block))
 
+        # Keep only the most recent KEEP_RECENT, compact the rest
         to_compact = tool_result_indices[:-self.KEEP_RECENT] if len(tool_result_indices) > self.KEEP_RECENT else []
+
         for i, j, block in to_compact:
             content_str = block.get("content", "")
             if isinstance(content_str, str) and self.estimate_tokens(content_str) > 1000:
                 block["content"] = "[Output compacted - re-read if needed]"
+
         return messages
 
     def should_compact(self, messages: list) -> bool:
+        """Check if context is approaching the window limit.
+        Skips compaction if estimated savings are below MIN_SAVINGS."""
         total = sum(self.estimate_tokens(json.dumps(m, default=str)) for m in messages)
-        return total > self.TOKEN_THRESHOLD
+        if total <= self.TOKEN_THRESHOLD:
+            return False
+        # Only compact if we'd save meaningful tokens (recent 5 messages kept)
+        recent_size = sum(
+            self.estimate_tokens(json.dumps(m, default=str))
+            for m in messages[-5:]
+        ) if len(messages) > 5 else total
+        savings = total - recent_size
+        return savings >= MIN_SAVINGS
 
     def auto_compact(self, messages: list) -> list:
+        """
+        Layer 2: Summarize entire conversation, preserving recent context.
+
+        1. Save full transcript to disk (never lose data)
+        2. Call model to generate chronological summary
+        3. Replace old messages with summary, keep recent 5
+        4. Restore recently-read files within token limits
+        """
         self.save_transcript(messages)
+
+        # Capture file access history before compaction
+        restored_files = self.restore_recent_files(messages)
+
         conversation_text = self._messages_to_text(messages)
+
         summary_response = client.messages.create(
             model=MODEL,
             system="You are a conversation summarizer. Be concise but thorough.",
-            messages=[{"role": "user", "content": f"Summarize this conversation chronologically. Include: goals, actions taken, decisions made, current state, and pending work.\n\n{conversation_text[:100000]}"}],
+            messages=[{
+                "role": "user",
+                "content": f"Summarize this conversation chronologically. Include: goals, actions taken, decisions made, current state, and pending work.\n\n{conversation_text[:100000]}"
+            }],
             max_tokens=2000,
         )
+
         summary = summary_response.content[0].text
+
+        # Inject summary as user message (preserves system prompt cache)
         recent = messages[-5:] if len(messages) > 5 else messages[-2:]
-        return [
+        result = [
             {"role": "user", "content": f"[Conversation compressed]\n\n{summary}"},
             {"role": "assistant", "content": "Understood. I have the context from the compressed conversation. Continuing work."},
-            *recent
         ]
+        # Interleave restored files as user/assistant pairs to maintain valid turn order
+        for rf in restored_files:
+            result.append(rf)
+            result.append({"role": "assistant", "content": "Noted, file content restored."})
+        result.extend(recent)
+        return result
 
     def handle_large_output(self, output: str) -> str:
+        """
+        Handle oversized tool output: save to disk, return preview.
+        """
         if self.estimate_tokens(output) <= self.MAX_OUTPUT_TOKENS:
             return output
+
         filename = f"output_{int(time.time())}.txt"
         path = TRANSCRIPT_DIR / filename
         path.write_text(output)
+
         preview = output[:2000]
         return f"Output too large ({self.estimate_tokens(output)} tokens). Saved to: {path}\n\nPreview:\n{preview}..."
 
     def save_transcript(self, messages: list):
+        """Append full transcript to disk. The permanent archive."""
         path = TRANSCRIPT_DIR / "transcript.jsonl"
         with open(path, "a") as f:
             for msg in messages:
                 f.write(json.dumps(msg, default=str) + "\n")
 
+    def restore_recent_files(self, messages: list) -> list:
+        """After auto-compact, re-inject recently-read files into context.
+        Scans conversation history for read_file calls and returns restoration
+        messages for the most recently accessed files within token limits."""
+        file_cache = {}
+        for msg in messages:
+            if msg.get("role") != "assistant":
+                continue
+            content = msg.get("content", [])
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if isinstance(block, dict) and block.get("name") == "read_file":
+                    path = block.get("input", {}).get("path", "")
+                    if path:
+                        file_cache[path] = len(file_cache)
+                elif hasattr(block, "name") and block.name == "read_file":
+                    path = getattr(block, "input", {}).get("path", "")
+                    if path:
+                        file_cache[path] = len(file_cache)
+
+        restored = []
+        total_tokens = 0
+        # Sort by access order (most recent last -> reverse for most recent first)
+        sorted_paths = sorted(file_cache.keys(), key=lambda p: file_cache[p], reverse=True)
+        for path in sorted_paths[:MAX_RESTORE_FILES]:
+            try:
+                full_path = (WORKDIR / path).resolve()
+                if not full_path.is_relative_to(WORKDIR) or not full_path.exists():
+                    continue
+                content = full_path.read_text()
+                tokens = self.estimate_tokens(content)
+                if tokens > MAX_RESTORE_TOKENS_PER_FILE:
+                    continue
+                if total_tokens + tokens > MAX_RESTORE_TOKENS_TOTAL:
+                    break
+                restored.append({
+                    "role": "user",
+                    "content": f"[Restored after compact] {path}:\n{content}"
+                })
+                total_tokens += tokens
+            except (OSError, ValueError):
+                continue
+        return restored
+
     def _find_tool_name(self, messages: list, tool_use_id: str) -> str:
+        """Find tool name from a tool_use_id in message history."""
         for msg in messages:
             if msg.get("role") != "assistant":
                 continue
@@ -372,6 +488,7 @@ class ContextManager:
         return ""
 
     def _messages_to_text(self, messages: list) -> str:
+        """Convert messages to plain text for summarization."""
         lines = []
         for msg in messages:
             role = msg.get("role", "?")
@@ -382,7 +499,8 @@ class ContextManager:
                 for block in content:
                     if isinstance(block, dict):
                         if block.get("type") == "tool_result":
-                            lines.append(f"[tool_result] {str(block.get('content', ''))[:200]}")
+                            text = str(block.get("content", ""))[:200]
+                            lines.append(f"[tool_result] {text}")
                         elif block.get("type") == "text":
                             lines.append(f"[{role}] {block.get('text', '')[:500]}")
                     elif hasattr(block, "text"):

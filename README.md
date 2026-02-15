@@ -64,16 +64,16 @@ Start Here
     |                          +ContextManager, ~896 lines
     v
 [v6: Tasks Agent] ----------> "From sticky notes to kanban"
-    |                          +TaskManager, ~957 lines
+    |                          +TaskManager, ~1075 lines
     v
 [v7: Background Agent] -----> "Don't wait, keep working"
-    |                          +BackgroundManager, ~1022 lines
+    |                          +BackgroundManager, ~1142 lines
     v
 [v8: Team Agent] -----------> "Teammates that communicate"
-    |                          +TeammateManager, ~1402 lines
+    |                          +TeammateManager, ~1553 lines
     v
 [v9: Autonomous Agent] -----> "A self-organizing team"
-                               +Idle cycle, ~1506 lines
+                               +Idle cycle, ~1657 lines
 ```
 
 **Recommended approach:**
@@ -140,10 +140,10 @@ That's it. The model calls tools until done. Everything else is refinement.
 | [v3](./v3_subagent.py) | ~623 | +Task | Context isolation | Clean context = better results |
 | [v4](./v4_skills_agent.py) | ~783 | +Skill | Knowledge loading | Expertise without retraining |
 | [v5](./v5_compression_agent.py) | ~896 | +ContextManager | 3-layer compression | Forgetting enables infinite work |
-| [v6](./v6_tasks_agent.py) | ~957 | +TaskCreate/Get/Update/List | Persistent tasks | Sticky notes to kanban |
-| [v7](./v7_background_agent.py) | ~1022 | +TaskOutput/TaskStop | Background execution | Serial to parallel |
-| [v8](./v8_team_agent.py) | ~1402 | +TeamCreate/SendMessage/TeamDelete | Team messaging | Command to collaboration |
-| [v9](./v9_autonomous_agent.py) | ~1506 | +Idle cycle/auto-claim | Autonomous teams | Collaboration to self-organization |
+| [v6](./v6_tasks_agent.py) | ~1075 | +TaskCreate/Get/Update/List | Persistent tasks | Sticky notes to kanban |
+| [v7](./v7_background_agent.py) | ~1142 | +TaskOutput/TaskStop | Background execution | Serial to parallel |
+| [v8](./v8_team_agent.py) | ~1553 | +TeamCreate/SendMessage/TeamDelete | Team messaging | Command to collaboration |
+| [v9](./v9_autonomous_agent.py) | ~1657 | +Idle cycle/auto-claim | Autonomous teams | Collaboration to self-organization |
 
 ## Sub-Mechanism Guide
 
@@ -186,10 +186,10 @@ learn-claude-code/
 |-- v3_subagent.py            # ~623 lines: + Task tool, agent registry
 |-- v4_skills_agent.py        # ~783 lines: + Skill tool, SkillLoader
 |-- v5_compression_agent.py   # ~896 lines: + ContextManager, 3-layer compression
-|-- v6_tasks_agent.py         # ~957 lines: + TaskManager, CRUD with dependencies
-|-- v7_background_agent.py    # ~1022 lines: + BackgroundManager, parallel execution
-|-- v8_team_agent.py          # ~1402 lines: + TeammateManager, team messaging
-|-- v9_autonomous_agent.py    # ~1506 lines: + Idle cycle, auto-claim, identity preservation
+|-- v6_tasks_agent.py         # ~1075 lines: + TaskManager, CRUD with dependencies
+|-- v7_background_agent.py    # ~1142 lines: + BackgroundManager, parallel execution
+|-- v8_team_agent.py          # ~1553 lines: + TeammateManager, team messaging
+|-- v9_autonomous_agent.py    # ~1657 lines: + Idle cycle, auto-claim, identity preservation
 |-- skills/                   # Example skills (pdf, code-review, mcp-builder, agent-builder)
 |-- docs/                     # Technical documentation (EN + ZH + JA)
 |-- articles/                 # Blog-style articles (ZH)

@@ -294,4 +294,4 @@ The next step is making teammates autonomous: instead of waiting for explicit in
 
 **One agent has limits. A team of agents has reach.**
 
-[<< v7](./v7-background-tasks.md) | [Back to README](../README.md) | [v9 >>](./v9-autonomous-teams.md)
+[← v7](./v7-background-tasks.md) | [Back to README](../README.md) | [v9 →](./v9-autonomous-teams.md)

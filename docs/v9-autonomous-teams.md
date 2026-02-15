@@ -222,4 +222,4 @@ The ultimate form of an agent system is not a smarter model, but **a group of mo
 
 **One agent has limits. A team of autonomous agents has none.**
 
-[<< v8](./v8-team-messaging.md) | [Back to README](../README.md)
+[← v8](./v8-team-messaging.md) | [Back to README](../README.md)

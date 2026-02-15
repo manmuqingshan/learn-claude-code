@@ -248,4 +248,4 @@ Background tasks also lay the groundwork for v8 Teammates: a Teammate is essenti
 
 **Serial waiting wastes time. Parallel notification unlocks efficiency.**
 
-[<< v6](./v6-tasks-system.md) | [Back to README](../README.md) | [v8 >>](./v8-team-messaging.md)
+[← v6](./v6-tasks-system.md) | [Back to README](../README.md) | [v8 →](./v8-team-messaging.md)

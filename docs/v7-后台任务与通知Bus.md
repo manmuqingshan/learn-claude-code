@@ -248,4 +248,4 @@ v6 的 Tasks 是看板——记录要做什么。v7 的后台任务是流水线�
 
 **串行等待浪费时间，并行通知解放效率。**
 
-[<< v6](./v6-Tasks系统.md) | [返回 README](../README_zh.md) | [v8 >>](./v8-团队通信.md)
+[← v6](./v6-Tasks系统.md) | [返回 README](../README_zh.md) | [v8 →](./v8-团队通信.md)

@@ -64,16 +64,16 @@
     |                    +ContextManager，~896 行
     v
 [v6: Tasks Agent] ----> "从便利贴到看板"
-    |                    +TaskManager，~957 行
+    |                    +TaskManager，~1075 行
     v
 [v7: Background] -----> "不等结果，继续干活"
-    |                    +BackgroundManager，~1022 行
+    |                    +BackgroundManager，~1142 行
     v
 [v8: Team Agent] -----> "团队通信"
-    |                    +TeammateManager，~1402 行
+    |                    +TeammateManager，~1553 行
     v
 [v9: Autonomous] -----> "自治团队"
-                         +空闲循环，~1506 行
+                         +空闲循环，~1657 行
 ```
 
 **推荐学习方式：**
@@ -140,10 +140,10 @@ while True:
 | [v3](./v3_subagent.py) | ~623 | +Task | 上下文隔离 | 干净上下文 = 更好结果 |
 | [v4](./v4_skills_agent.py) | ~783 | +Skill | 知识加载 | 专业无需重训 |
 | [v5](./v5_compression_agent.py) | ~896 | +ContextManager | 三层压缩 | 遗忘成就无限工作 |
-| [v6](./v6_tasks_agent.py) | ~957 | +TaskCreate/Get/Update/List | 持久化任务 | 便利贴到看板 |
-| [v7](./v7_background_agent.py) | ~1022 | +TaskOutput/TaskStop | 后台执行 | 串行到并行 |
-| [v8](./v8_team_agent.py) | ~1402 | +TeamCreate/SendMessage/TeamDelete | 团队通信 | 命令到协作 |
-| [v9](./v9_autonomous_agent.py) | ~1506 | +空闲循环/自动认领 | 自治团队 | 协作到自组织 |
+| [v6](./v6_tasks_agent.py) | ~1075 | +TaskCreate/Get/Update/List | 持久化任务 | 便利贴到看板 |
+| [v7](./v7_background_agent.py) | ~1142 | +TaskOutput/TaskStop | 后台执行 | 串行到并行 |
+| [v8](./v8_team_agent.py) | ~1553 | +TeamCreate/SendMessage/TeamDelete | 团队通信 | 命令到协作 |
+| [v9](./v9_autonomous_agent.py) | ~1657 | +空闲循环/自动认领 | 自治团队 | 协作到自组织 |
 
 ## 子机制导航
 
@@ -186,10 +186,10 @@ learn-claude-code/
 |-- v3_subagent.py         # ~623 行: + Task 工具，代理注册表
 |-- v4_skills_agent.py     # ~783 行: + Skill 工具，SkillLoader
 |-- v5_compression_agent.py # ~896 行: + ContextManager，三层压缩
-|-- v6_tasks_agent.py      # ~957 行: + TaskManager，依赖图 CRUD
-|-- v7_background_agent.py # ~1022 行: + BackgroundManager，并行执行
-|-- v8_team_agent.py       # ~1402 行: + TeammateManager，团队通信
-|-- v9_autonomous_agent.py # ~1506 行: + 空闲循环，自动认领，身份保持
+|-- v6_tasks_agent.py      # ~1075 行: + TaskManager，依赖图 CRUD
+|-- v7_background_agent.py # ~1142 行: + BackgroundManager，并行执行
+|-- v8_team_agent.py       # ~1553 行: + TeammateManager，团队通信
+|-- v9_autonomous_agent.py # ~1657 行: + 空闲循环，自动认领，身份保持
 |-- skills/                # 示例 Skills（pdf, code-review, mcp-builder, agent-builder）
 |-- docs/                  # 技术文档（中英日三语）
 |-- articles/              # 公众号风格文章

@@ -197,4 +197,4 @@ TodoWrite 像是便利贴——一个人用，用完就扔。Tasks 像是项目�
 
 **清单让一个 Agent 有条理，任务系统让一群 Agent 有秩序。**
 
-[<< v5](./v5-上下文压缩.md) | [返回 README](../README_zh.md) | [v7 >>](./v7-后台任务与通知Bus.md)
+[← v5](./v5-上下文压缩.md) | [返回 README](../README_zh.md) | [v7 →](./v7-后台任务与通知Bus.md)

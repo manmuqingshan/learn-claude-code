@@ -198,4 +198,4 @@ When agents evolve from individual to collective, task management must evolve fr
 
 **A checklist keeps one agent organized. A task system keeps a team in order.**
 
-[<< v5](./v5-context-compression.md) | [Back to README](../README.md) | [v7 >>](./v7-background-tasks.md)
+[← v5](./v5-context-compression.md) | [Back to README](../README.md) | [v7 →](./v7-background-tasks.md)
